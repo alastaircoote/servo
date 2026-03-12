@@ -214,6 +214,10 @@ public class MainActivity extends Activity implements Servo.Client {
         mReloadButton.setVisibility(View.VISIBLE);
         mStopButton.setVisibility(View.GONE);
         mProgressBar.setVisibility(View.INVISIBLE);
+        mServoView.evaluateJavascript("document.body.innerHTML.length",(resultJson, errorJson) -> {
+            // JSValue doesn't yet convert to a string correctly, but...
+            Log.i("TEST", "onLoadEnded: body is " + resultJson.toString() + " characters long");
+        });
     }
 
     @Override

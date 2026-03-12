@@ -15,7 +15,7 @@ use std::sync::Arc;
 use android_logger::{self, Config, FilterBuilder};
 use euclid::{Point2D, Rect, Scale, Size2D};
 use jni::objects::{GlobalRef, JClass, JObject, JString, JValue, JValueOwned};
-use jni::sys::{jboolean, jfloat, jint, jobject};
+use jni::sys::{jboolean, jfloat, jint, jlong, jobject};
 use jni::{JNIEnv, JavaVM};
 use keyboard_types::{Key, NamedKey};
 use log::{debug, error, info, warn};
@@ -270,6 +270,110 @@ pub extern "C" fn Java_org_servo_servoview_JNIServo_loadUri<'local>(
             throw(&mut env, "Failed to convert Java string");
         },
     };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn Java_org_servo_servoview_JNIServo_evaluateJavascript<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    script: JString<'local>,
+    callback: JObject<'local>,
+) {
+    debug!("evaluateJavascript");
+
+    let callback_ref = match env.new_global_ref(callback) {
+        Ok(r) => r,
+        Err(_) => {
+            throw(&mut env, "Failed to get global reference of callback argument");
+            return;
+        },
+    };
+
+    let jvm = Arc::new(match env.get_java_vm() {
+        Ok(jvm) => jvm,
+        Err(_) => {
+            throw(&mut env, "Failed to get Java VM");
+            return;
+        },
+    });
+
+    match env.get_string(&script) {
+        Ok(script) => {
+            let script: String = script.into();
+            call(&mut env, |s| {
+                let callback_ref = callback_ref.clone();
+                let jvm = jvm.clone();
+                s.evaluate_javascript(&script, move |result| {
+                    let mut env = match jvm.attach_current_thread() {
+                        Ok(env) => env,
+                        Err(error) => {
+                            warn!("Failed to attach JNI thread for JS evaluation callback: {error}");
+                            return;
+                        },
+                    };
+
+                    let (native_ptr, error_msg) = match result {
+                        Ok(value) => {
+                            let boxed = Box::new(value);
+                            (Box::into_raw(boxed) as jlong, String::new())
+                        },
+                        Err(error) => (0 as jlong, format!("{error:?}")),
+                    };
+
+                    let jsvalue_class = match env.find_class("org/servo/servoview/JSValue") {
+                        Ok(cls) => cls,
+                        Err(error) => {
+                            warn!("Failed to find JSValue class: {error}");
+                            return;
+                        },
+                    };
+
+                    let jsvalue_obj = if native_ptr != 0 {
+                        match env.new_object(jsvalue_class, "(J)V", &[JValue::Long(native_ptr)]) {
+                            Ok(obj) => obj,
+                            Err(error) => {
+                                warn!("Failed to create JSValue object: {error}");
+                                // Safety: we own this pointer and must free it on failure.
+                                unsafe { drop(Box::from_raw(native_ptr as *mut servo::JSValue)) };
+                                return;
+                            },
+                        }
+                    } else {
+                        JObject::null()
+                    };
+
+                    let Ok(error_string) = new_string_as_jvalue(&mut env, &error_msg) else {
+                        return;
+                    };
+
+                    if let Err(error) = env.call_method(
+                        callback_ref.as_obj(),
+                        "onEvaluationResult",
+                        "(Lorg/servo/servoview/JSValue;Ljava/lang/String;)V",
+                        &[(&jsvalue_obj).into(), (&error_string).into()],
+                    ) {
+                        warn!("Failed to invoke onEvaluationResult callback: {error}");
+                    }
+                });
+            });
+        },
+        Err(_) => {
+            throw(&mut env, "Failed to convert Java string");
+        },
+    };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn Java_org_servo_servoview_JSValue_nativeRelease<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    ptr: jlong,
+) {
+    if ptr != 0 {
+        // Safety: this pointer was created by Box::into_raw in the evaluateJavascript callback
+        // and must only be released once.
+        unsafe { drop(Box::from_raw(ptr as *mut servo::JSValue)) };
+    }
 }
 
 #[unsafe(no_mangle)]

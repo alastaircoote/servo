@@ -199,6 +199,12 @@ public class ServoView extends SurfaceView
         }
     }
 
+    public void evaluateJavascript(String script, JNIServo.EvaluationCallback callback) {
+        if (mServo != null) {
+            mServo.evaluateJavascript(script, callback);
+        }
+    }
+
     public void mediaSessionAction(int action) {
         mServo.mediaSessionAction(action);
     }

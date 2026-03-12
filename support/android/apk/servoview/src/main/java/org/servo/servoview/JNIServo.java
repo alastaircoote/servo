@@ -41,6 +41,8 @@ public class JNIServo {
 
     public native void loadUri(String uri);
 
+    public native void evaluateJavascript(String script, EvaluationCallback callback);
+
     public native void scroll(int dx, int dy, int x, int y);
 
     public native void keydown(int keycode, int unicode);
@@ -119,4 +121,8 @@ public class JNIServo {
 
         void onMediaSessionSetPositionState(float duration, float position, float playbackRate);
     }
+
+      public interface EvaluationCallback {
+        void onEvaluationResult(JSValue value, String error);
+      }
 }

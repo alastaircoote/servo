@@ -77,6 +77,10 @@ public class Servo {
         mRunCallback.inGLThread(() -> mJNI.loadUri(uri));
     }
 
+    public void evaluateJavascript(String script, JNIServo.EvaluationCallback callback) {
+        mRunCallback.inGLThread(() -> mJNI.evaluateJavascript(script, callback));
+    }
+
     public void scroll(int dx, int dy, int x, int y) {
         mRunCallback.inGLThread(() -> mJNI.scroll(dx, dy, x, y));
     }
