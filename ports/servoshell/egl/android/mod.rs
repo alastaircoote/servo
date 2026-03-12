@@ -289,20 +289,19 @@ pub extern "C" fn Java_org_servo_servoview_JNIServo_evaluateJavascript<'local>(
         },
     };
 
-    let jvm = Arc::new(match env.get_java_vm() {
+    let jvm = match env.get_java_vm() {
         Ok(jvm) => jvm,
         Err(_) => {
             throw(&mut env, "Failed to get Java VM");
             return;
         },
-    });
+    };
 
     match env.get_string(&script) {
         Ok(script) => {
             let script: String = script.into();
             call(&mut env, |s| {
                 let callback_ref = callback_ref.clone();
-                let jvm = jvm.clone();
                 s.evaluate_javascript(&script, move |result| {
                     let mut env = match jvm.attach_current_thread() {
                         Ok(env) => env,
