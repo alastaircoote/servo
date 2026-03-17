@@ -583,12 +583,17 @@ pub extern "C" fn Java_org_servo_servoview_JNIServo_evaluateJavaScript<'local>(
     let jvm = env.get_java_vm().unwrap();
 
     call(&mut env, move |app| {
+        let mut env = match jvm.attach_current_thread() {
+            Ok(env) => env,
+            Err(err) => {
+                error!("Failed to attach current thread to JVM: {:?}", err);
+                return;
+            },
+        };
         let Some(webview) = app.active_or_newest_webview() else {
-            let mut env = jvm.get_env().unwrap();
             return complete_future_exceptionally(&mut env, future_ref.as_obj(), "No active webview");
         };
         webview.evaluate_javascript(script, move |result| {
-            let mut env = jvm.get_env().unwrap();
             match result {
                 Ok(value) => {
                     let json = serde_json::to_string(&js_value_to_json(value))
