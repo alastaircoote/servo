@@ -552,6 +552,71 @@ pub extern "C" fn Java_org_servo_servoview_JNIServo_mediaSessionAction<'local>(
     call(&mut env, |s| s.media_session_action(action.clone()));
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn Java_org_servo_servoview_JNIServo_evaluateJavaScript<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    script: JString<'local>,
+    future_obj: JObject<'local>,
+) {
+    debug!("evaluateJavaScript");
+    let script: String = match env.get_string(&script) {
+        Ok(s) => s.into(),
+        Err(_) => return throw(&mut env, "Failed to convert Java string"),
+    };
+    let future_ref = match env.new_global_ref(future_obj) {
+        Ok(r) => r,
+        Err(_) => return throw(&mut env, "Failed to create global ref for future"),
+    };
+    let jvm = env.get_java_vm().unwrap();
+
+    call(&mut env, move |app| {
+        if let Some(webview) = app.active_or_newest_webview() {
+            webview.evaluate_javascript(script, move |result| {
+                let mut env = jvm.get_env().unwrap();
+                match result {
+                    Ok(value) => {
+                        let json = serde_json::to_string(&js_value_to_json(value))
+                            .unwrap_or_else(|_| "null".to_owned());
+                        let Ok(json_jstr) = env.new_string(&json) else {
+                            return;
+                        };
+                        env.call_method(
+                            future_ref.as_obj(),
+                            "complete",
+                            "(Ljava/lang/Object;)Z",
+                            &[JValue::Object(&json_jstr)],
+                        )
+                        .unwrap();
+                    },
+                    Err(error) => {
+                        let error_str = serde_json::to_string(&error)
+                            .unwrap_or_else(|_| format!("{error:?}"));
+                        let Ok(msg_jstr) = env.new_string(&error_str) else {
+                            return;
+                        };
+                        let Ok(exception) = env.new_object(
+                            "java/lang/RuntimeException",
+                            "(Ljava/lang/String;)V",
+                            &[JValue::Object(&msg_jstr)],
+                        ) else {
+                            return;
+                        };
+                        env.call_method(
+                            future_ref.as_obj(),
+                            "completeExceptionally",
+                            "(Ljava/lang/Throwable;)Z",
+                            &[JValue::Object(&exception)],
+                        )
+                        .unwrap();
+                    },
+                }
+            });
+            app.spin_event_loop();
+        }
+    });
+}
+
 pub struct WakeupCallback {
     callback: GlobalRef,
     jvm: Arc<JavaVM>,
@@ -745,6 +810,29 @@ impl HostTrait for HostCallbacks {
 
 unsafe extern "C" {
     pub fn __android_log_write(prio: c_int, tag: *const c_char, text: *const c_char) -> c_int;
+}
+
+fn js_value_to_json(value: servo::JSValue) -> serde_json::Value {
+    match value {
+        servo::JSValue::Undefined | servo::JSValue::Null => serde_json::Value::Null,
+        servo::JSValue::Boolean(b) => serde_json::Value::Bool(b),
+        servo::JSValue::Number(n) => serde_json::Number::from_f64(n)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        servo::JSValue::String(s) => serde_json::Value::String(s),
+        servo::JSValue::Element(s) |
+        servo::JSValue::ShadowRoot(s) |
+        servo::JSValue::Frame(s) |
+        servo::JSValue::Window(s) => serde_json::Value::String(s),
+        servo::JSValue::Array(arr) => {
+            serde_json::Value::Array(arr.into_iter().map(js_value_to_json).collect())
+        },
+        servo::JSValue::Object(map) => serde_json::Value::Object(
+            map.into_iter()
+                .map(|(k, v)| (k, js_value_to_json(v)))
+                .collect(),
+        ),
+    }
 }
 
 fn throw(env: &mut JNIEnv, err: &str) {
