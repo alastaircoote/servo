@@ -580,7 +580,16 @@ pub extern "C" fn Java_org_servo_servoview_JNIServo_evaluateJavaScript<'local>(
             )
         },
     };
-    let jvm = env.get_java_vm().unwrap();
+    let jvm = match env.get_java_vm() {
+        Ok(jvm) => jvm,
+        Err(_) => {
+            return complete_future_exceptionally(
+                &mut env,
+                future_ref.as_obj(),
+                "Failed to get JavaVM",
+            )
+        },
+    };
 
     call(&mut env, move |app| {
         let mut env = match jvm.attach_current_thread() {
