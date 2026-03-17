@@ -71,6 +71,9 @@ public class JNIServo {
 
     public native void doFrame();
 
+    public native void evaluateJavaScript(String script,
+        java.util.concurrent.CompletableFuture<String> future);
+
     public static class ServoOptions {
       public String args;
       public String url;

@@ -209,6 +209,16 @@ public class ServoView extends SurfaceView
         }
     }
 
+    public java.util.concurrent.CompletableFuture<String> evaluateJavaScript(String script) {
+        if (mServo != null) {
+            return mServo.evaluateJavaScript(script);
+        }
+        java.util.concurrent.CompletableFuture<String> f =
+            new java.util.concurrent.CompletableFuture<>();
+        f.completeExceptionally(new RuntimeException("Servo not initialized"));
+        return f;
+    }
+
     class GLThread extends Thread implements SurfaceHolder.Callback {
         private Activity mActivity;
         private ServoView mServoView;

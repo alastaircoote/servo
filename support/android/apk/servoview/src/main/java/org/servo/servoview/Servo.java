@@ -144,6 +144,13 @@ public class Servo {
         mRunCallback.inGLThread(() -> mJNI.doFrame());
     }
 
+    public java.util.concurrent.CompletableFuture<String> evaluateJavaScript(String script) {
+        java.util.concurrent.CompletableFuture<String> future =
+            new java.util.concurrent.CompletableFuture<>();
+        mRunCallback.inGLThread(() -> mJNI.evaluateJavaScript(script, future));
+        return future;
+    }
+
     public interface Client {
         void onAlert(String message);
 
