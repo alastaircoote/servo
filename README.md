@@ -2,7 +2,7 @@
 
 This is a fork of the Servo project that I'm using to experiment with future viability, particularly around the idea of using it for Android webviews.
 
-Most importantly, I'm using AI (specifically Claude Code) to generate code. The Servo contributors guide [forbids AI contributions](https://book.servo.org/contributing/getting-started#ai-contributions), which is a perspective I entirely respect. As such the features developed in this repo won't be upstreamed to the main repo unless their contribution rules change.
+Most importantly, I'm using AI (specifically Claude Code) to generate code. The Servo contributors guide [forbids AI contributions](https://book.servo.org/contributing/getting-started#ai-contributions), which is a perspective I entirely respect. As such the features developed in this repo won't be upstreamed to the main repo unless their contribution rules change (the guide notes that they might!)
 
 ---
 
