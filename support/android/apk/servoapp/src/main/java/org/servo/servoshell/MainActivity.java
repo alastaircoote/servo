@@ -214,9 +214,6 @@ public class MainActivity extends Activity implements Servo.Client {
         mReloadButton.setVisibility(View.VISIBLE);
         mStopButton.setVisibility(View.GONE);
         mProgressBar.setVisibility(View.INVISIBLE);
-        mServoView.evaluateJavaScript("1+1").thenAccept( str -> {
-            Log.d("EV TEST", "onLoadEnded: " + str);
-        });
     }
 
     @Override
